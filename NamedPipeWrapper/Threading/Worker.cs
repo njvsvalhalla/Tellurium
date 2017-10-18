@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -40,7 +37,7 @@ namespace NamedPipeWrapper.Threading
 
         private void DoWorkImpl(object oAction)
         {
-            var action = (Action) oAction;
+            var action = (Action)oAction;
             try
             {
                 action();

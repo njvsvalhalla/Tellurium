@@ -1,13 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using NamedPipeWrapper.IO;
+using NamedPipeWrapper.Threading;
+using System;
 using System.IO;
 using System.IO.Pipes;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
-using NamedPipeWrapper.IO;
-using NamedPipeWrapper.Threading;
 
 namespace NamedPipeWrapper
 {
@@ -224,7 +221,7 @@ namespace NamedPipeWrapper
         [return: MarshalAs(UnmanagedType.Bool)]
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern bool WaitNamedPipe(string name, int timeout);
-        
+
         public static bool NamedPipeExists(string pipeName)
         {
             try
