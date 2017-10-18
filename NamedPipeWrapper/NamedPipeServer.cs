@@ -228,6 +228,16 @@ namespace NamedPipeWrapper
 		{
 			_shouldKeepRunning = false;
 
+			// NOTE: clients might use autoretry. If that is the case, an existing client that gets closed right now will reconnect and take the 'slot' of the dummy client.
+			// In order to minimize these chances, create the dummy client now, before closing the clients.
+			// This prevents the delays of 2+2 seconds in most scenarios.
+
+			// this dummy connection will use the local server name.
+			var dummyClient = new NamedPipeClient<TRead, TWrite>(_pipeName, ".");
+			dummyClient.Start();
+			dummyClient.WaitForConnection(TimeSpan.FromSeconds(2));
+
+			// the dummy client, if successfully connected, should now be on the list of connections, so this loop will affect it too:
 			lock (_connections)
 			{
 				foreach (var client in _connections.ToArray())
@@ -236,12 +246,7 @@ namespace NamedPipeWrapper
 				}
 			}
 
-            // If background thread is still listening for a client to connect,
-            // initiate a dummy connection that will allow the thread to exit.
-            // this dummy connection will use the local server name.
-            var dummyClient = new NamedPipeClient<TRead, TWrite>(_pipeName, ".");
-            dummyClient.Start();
-			dummyClient.WaitForConnection(TimeSpan.FromSeconds(2));
+			// and close the dummy client anyway
 			dummyClient.Stop();
 			dummyClient.WaitForDisconnection(TimeSpan.FromSeconds(2));
 		}
