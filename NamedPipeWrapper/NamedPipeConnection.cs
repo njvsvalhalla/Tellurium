@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO.Pipes;
 using System.Linq;
@@ -57,8 +58,7 @@ namespace NamedPipeWrapper
 
         private readonly PipeStreamWrapper<TRead, TWrite> _streamWrapper;
 
-        private readonly AutoResetEvent _writeSignal = new AutoResetEvent(false);
-        private readonly Queue<TWrite> _writeQueue = new Queue<TWrite>();
+        private readonly BlockingCollection<TWrite> _writeQueue = new BlockingCollection<TWrite>(); // support multithreading when pushing
 
         private bool _notifiedSucceeded;
 
@@ -91,12 +91,12 @@ namespace NamedPipeWrapper
         /// Adds the specified <paramref name="message"/> to the write queue.
         /// The message will be written to the named pipe by the background thread
         /// at the next available opportunity.
+        /// Note: this method is thread-safe: multiple threads might call this method concurrently.
         /// </summary>
         /// <param name="message"></param>
         public void PushMessage(TWrite message)
         {
-            _writeQueue.Enqueue(message);
-            _writeSignal.Set();
+            _writeQueue.Add(message);
         }
 
         /// <summary>
@@ -113,7 +113,7 @@ namespace NamedPipeWrapper
         private void CloseImpl()
         {
             _streamWrapper.Close();
-            _writeSignal.Set();
+            _writeQueue.CompleteAdding();
         }
 
         /// <summary>
@@ -168,12 +168,23 @@ namespace NamedPipeWrapper
         {
             while (IsConnected && _streamWrapper.CanWrite)
             {
-                _writeSignal.WaitOne();
-                while (_writeQueue.Count > 0)
+                TWrite x;
+                try
                 {
-                    _streamWrapper.WriteObject(_writeQueue.Dequeue());
-                    _streamWrapper.WaitForPipeDrain();
+                    x = _writeQueue.Take();
                 }
+                catch (InvalidOperationException)
+                {
+                    // we have marked the queue as finished, so we don't have more to write
+                    break;
+                }
+                catch (OperationCanceledException)
+                {
+                    // we have marked the queue as finished, so we don't have more to write
+                    break;
+                }
+                _streamWrapper.WriteObject(x);
+                _streamWrapper.WaitForPipeDrain();
             }
         }
     }
