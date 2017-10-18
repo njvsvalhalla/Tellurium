@@ -35,7 +35,7 @@ namespace ExampleGUI
                 }));
         }
 
-        private void OnDisconnected(NamedPipeConnection<string, string> connection)
+        private void OnDisconnected(NamedPipeConnection<string, string> connection, bool isExplicit)
         {
             richTextBoxMessages.Invoke(new Action(delegate
                 {
