@@ -236,10 +236,11 @@ namespace NamedPipeWrapper
 				}
 			}
 
-			// If background thread is still listening for a client to connect,
-			// initiate a dummy connection that will allow the thread to exit.
-			var dummyClient = new NamedPipeClient<TRead, TWrite>(_pipeName);
-			dummyClient.Start();
+            // If background thread is still listening for a client to connect,
+            // initiate a dummy connection that will allow the thread to exit.
+            // this dummy connection will use the local server name.
+            var dummyClient = new NamedPipeClient<TRead, TWrite>(_pipeName, ".");
+            dummyClient.Start();
 			dummyClient.WaitForConnection(TimeSpan.FromSeconds(2));
 			dummyClient.Stop();
 			dummyClient.WaitForDisconnection(TimeSpan.FromSeconds(2));
