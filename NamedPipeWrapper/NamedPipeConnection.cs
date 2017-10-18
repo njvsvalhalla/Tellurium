@@ -208,6 +208,17 @@ namespace NamedPipeWrapper
         where TWrite : class;
 
     /// <summary>
+    /// Handles new connections.
+    /// </summary>
+    /// <param name="connection">The newly established connection</param>
+    /// <param name="explicitClose">True if the connection has been explicitely closed. Can be used to attempt reconnects</param>
+    /// <typeparam name="TRead">Reference type</typeparam>
+    /// <typeparam name="TWrite">Reference type</typeparam>
+    public delegate void ConnectionDisconnectedEventHandler<TRead, TWrite>(NamedPipeConnection<TRead, TWrite> connection, bool explicitClose)
+        where TRead : class
+        where TWrite : class;
+
+    /// <summary>
     /// Handles messages received from a named pipe.
     /// </summary>
     /// <typeparam name="TRead">Reference type</typeparam>

@@ -34,21 +34,6 @@ namespace NamedPipeWrapper
         where TWrite : class
     {
         /// <summary>
-        /// Gets or sets whether the client should attempt to reconnect when the pipe breaks
-        /// due to an error or the other end terminating the connection.
-        /// Default value is <c>true</c>.
-        /// </summary>
-        public bool AutoReconnect { get; set; }
-
-        /// <summary>
-        /// Gets or sets how long the client waits between a reconnection attempt.
-        /// Default value is <c>0</c>.
-        /// </summary>
-        public int AutoReconnectDelay { get; set; }
-
-
-
-        /// <summary>
         /// Invoked whenever a message is received from the server.
         /// </summary>
         public event ConnectionMessageEventHandler<TRead, TWrite> ServerMessage;
@@ -56,7 +41,7 @@ namespace NamedPipeWrapper
         /// <summary>
         /// Invoked when the client disconnects from the server (e.g., the pipe is closed or broken).
         /// </summary>
-        public event ConnectionEventHandler<TRead, TWrite> Disconnected;
+        public event ConnectionDisconnectedEventHandler<TRead, TWrite> Disconnected;
 
         /// <summary>
         /// Invoked whenever an exception is thrown during a read or write operation on the named pipe.
@@ -70,6 +55,7 @@ namespace NamedPipeWrapper
         private readonly AutoResetEvent _disconnected = new AutoResetEvent(false);
 
         private volatile bool _closedExplicitly;
+        private CancellationTokenSource _ctsCancelConnect;
         private readonly string _serverName;
 
         /// <summary>
@@ -81,16 +67,16 @@ namespace NamedPipeWrapper
         {
             _pipeName = pipeName;
             _serverName = serverName;
-            AutoReconnect = true;
         }
 
         /// <summary>
         /// Connects to the named pipe server asynchronously.
         /// This method returns immediately, possibly before the connection has been established.
         /// </summary>
-        public void Start(bool waitForconnection = false)
+        public void Start()
         {
             _closedExplicitly = false;
+            _ctsCancelConnect = new CancellationTokenSource();
             var worker = new Worker();
             worker.Error += OnError;
             worker.DoWork(ListenSync);
@@ -111,6 +97,7 @@ namespace NamedPipeWrapper
         /// </summary>
         public void Stop()
         {
+            _ctsCancelConnect.Cancel();
             _closedExplicitly = true;
             if (_connection != null)
                 _connection.Close();
@@ -118,51 +105,82 @@ namespace NamedPipeWrapper
 
         #region Wait for connection/disconnection
 
-        public void WaitForConnection()
+        /// <summary>
+        /// Waits until the connection has been established, and returns true.
+        /// Returns false if the connection has not and will not happen.
+        /// </summary>
+        public bool WaitForConnection()
         {
-            _connected.WaitOne();
+            var response = WaitHandle.WaitAny(new[] { _connected, _ctsCancelConnect.Token.WaitHandle });
+            return response == 0;
         }
 
-        public void WaitForConnection(int millisecondsTimeout)
+        /// <summary>
+        /// Waits until the connection has been established or until the timeout, and returns true if the connection has been established.
+        /// Returns false if the connection is not established after the timeout.
+        /// </summary>
+        public bool WaitForConnection(int millisecondsTimeout)
         {
-            _connected.WaitOne(millisecondsTimeout);
+            var response = WaitHandle.WaitAny(new[] { _connected, _ctsCancelConnect.Token.WaitHandle }, millisecondsTimeout);
+            return response == 0;
         }
 
-        public void WaitForConnection(TimeSpan timeout)
+        /// <summary>
+        /// Waits until the connection has been established or until the timeout, and returns true if the connection has been established.
+        /// Returns false if the connection is not established after the timeout.
+        /// </summary>
+        public bool WaitForConnection(TimeSpan timeout)
         {
-            _connected.WaitOne(timeout);
+            var response = WaitHandle.WaitAny(new[] { _connected, _ctsCancelConnect.Token.WaitHandle }, timeout);
+            return response == 0;
         }
 
-        public void WaitForDisconnection()
+        /// <summary>
+        /// Waits until the disconnection has been completed, and returns true.
+        /// Returns false if the connection was not established, or if the disconnection has not and will not happen.
+        /// </summary>
+        public bool WaitForDisconnection()
         {
-            _disconnected.WaitOne();
+            if (_connection == null) { return true; }
+            var response = WaitHandle.WaitAny(new[] { _disconnected, _ctsCancelConnect.Token.WaitHandle });
+            return response == 0;
         }
 
-        public void WaitForDisconnection(int millisecondsTimeout)
+        /// <summary>
+        /// Waits until the disconnection has been completed or until the timeout, and returns true if the disconnection has been completed.
+        /// Returns false if the connection was not established, or if the disconnection has not and will not happen.
+        /// </summary>
+        public bool WaitForDisconnection(int millisecondsTimeout)
         {
-            _disconnected.WaitOne(millisecondsTimeout);
+            var response = WaitHandle.WaitAny(new[] { _disconnected, _ctsCancelConnect.Token.WaitHandle }, millisecondsTimeout);
+            return response == 0;
         }
 
-        public void WaitForDisconnection(TimeSpan timeout)
+        /// <summary>
+        /// Waits until the disconnection has been completed or until the timeout, and returns true if the disconnection has been completed.
+        /// Returns false if the connection was not established, or if the disconnection has not and will not happen.
+        /// </summary>
+        public bool WaitForDisconnection(TimeSpan timeout)
         {
-            _disconnected.WaitOne(timeout);
+            var response = WaitHandle.WaitAny(new[] { _disconnected, _ctsCancelConnect.Token.WaitHandle }, timeout);
+            return response == 0;
         }
 
         #endregion
 
         #region Private methods
 
-
-
         private void ListenSync()
         {
             // Get the name of the data pipe that should be used from now on by this NamedPipeClient
-            var handshake = PipeClientFactory.Connect<string, string>(_pipeName, _serverName);
+            var handshake = PipeClientFactory.Connect<string, string>(_pipeName, _serverName, _ctsCancelConnect.Token);
+            if (handshake == null) { return; }
             var dataPipeName = handshake.ReadObject();
             handshake.Close();
 
             // Connect to the actual data pipe
-            var dataPipe = PipeClientFactory.CreateAndConnectPipe(dataPipeName, _serverName);
+            var dataPipe = PipeClientFactory.CreateAndConnectPipe(dataPipeName, _serverName, _ctsCancelConnect.Token);
+            if (dataPipe == null) { return; }
 
             // Create a Connection object for the data pipe
             _connection = ConnectionFactory.CreateConnection<TRead, TWrite>(dataPipe);
@@ -176,17 +194,11 @@ namespace NamedPipeWrapper
 
         private void OnDisconnected(NamedPipeConnection<TRead, TWrite> connection)
         {
-            if (Disconnected != null)
-                Disconnected(connection);
-
+            // set before, so that if the eventhandler wants to connect again, the order of the events is still correct
             _disconnected.Set();
 
-            // Reconnect
-            if (AutoReconnect && !_closedExplicitly)
-            {
-                Thread.Sleep(AutoReconnectDelay);
-                Start();
-            }
+            if (Disconnected != null)
+                Disconnected(connection, _closedExplicitly);
         }
 
         private void OnReceiveMessage(NamedPipeConnection<TRead, TWrite> connection, TRead message)
@@ -226,7 +238,7 @@ namespace NamedPipeWrapper
         {
             try
             {
-                bool exists = WaitNamedPipe(pipeName, -1);
+                bool exists = WaitNamedPipe(pipeName, 0);
                 if (!exists)
                 {
                     int error = Marshal.GetLastWin32Error();
@@ -243,20 +255,26 @@ namespace NamedPipeWrapper
             }
         }
 
-        public static PipeStreamWrapper<TRead, TWrite> Connect<TRead, TWrite>(string pipeName, string serverName)
+        public static PipeStreamWrapper<TRead, TWrite> Connect<TRead, TWrite>(string pipeName, string serverName, CancellationToken cancelToken)
             where TRead : class
             where TWrite : class
         {
-            return new PipeStreamWrapper<TRead, TWrite>(CreateAndConnectPipe(pipeName, serverName));
+            var inner = CreateAndConnectPipe(pipeName, serverName, cancelToken);
+            if (inner == null)
+            {
+                return null;
+            }
+            return new PipeStreamWrapper<TRead, TWrite>(inner);
         }
 
-        public static NamedPipeClientStream CreateAndConnectPipe(string pipeName, string serverName, int timeout = 10)
+        public static NamedPipeClientStream CreateAndConnectPipe(string pipeName, string serverName, CancellationToken cancelToken, int timeout = 10)
         {
             string normalizedPath = Path.GetFullPath(string.Format(@"\\{1}\pipe\{0}", pipeName, serverName));
-            while (!NamedPipeExists(normalizedPath))
+            while (!cancelToken.IsCancellationRequested && !NamedPipeExists(normalizedPath))
             {
                 Thread.Sleep(timeout);
             }
+            if (cancelToken.IsCancellationRequested) { return null; }
             var pipe = CreatePipe(pipeName, serverName);
             pipe.Connect(1000);
             return pipe;

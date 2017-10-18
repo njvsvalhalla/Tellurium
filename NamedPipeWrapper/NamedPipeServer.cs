@@ -224,6 +224,11 @@ namespace NamedPipeWrapper
         /// </summary>
         public void Stop()
         {
+            if (!_shouldKeepRunning)
+            {
+                return;
+            }
+
             _shouldKeepRunning = false;
 
             // NOTE: clients might use autoretry. If that is the case, an existing client that gets closed right now will reconnect and take the 'slot' of the dummy client.
