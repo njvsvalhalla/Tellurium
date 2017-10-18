@@ -37,6 +37,10 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Serialization\StringUtf8Serializer.cs" />
+    <Compile Include="Serialization\ByteArrayAsIsSerializer.cs" />
+    <Compile Include="Serialization\ICustomSerializer.cs" />
+    <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="NamedPipeClient.cs" />
     <Compile Include="NamedPipeConnection.cs" />
     <Compile Include="IO\PipeStreamReader.cs" />

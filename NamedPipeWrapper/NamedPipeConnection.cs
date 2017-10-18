@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
+using NamedPipeWrapper.Serialization;
 
 namespace NamedPipeWrapper
 {
@@ -58,12 +59,12 @@ namespace NamedPipeWrapper
 
         private bool _notifiedSucceeded;
 
-        internal NamedPipeConnection(int id, string name, PipeStream serverStream)
+        internal NamedPipeConnection(int id, string name, PipeStream serverStream, ICustomSerializer<TRead> serializerRead, ICustomSerializer<TWrite> serializerWrite)
         {
             Id = id;
             Name = name;
             Handle = serverStream.SafePipeHandle;
-            _streamWrapper = new PipeStreamWrapper<TRead, TWrite>(serverStream);
+            _streamWrapper = new PipeStreamWrapper<TRead, TWrite>(serverStream, serializerRead, serializerWrite);
         }
 
         /// <summary>
@@ -189,11 +190,11 @@ namespace NamedPipeWrapper
     {
         private static int _lastId;
 
-        public static NamedPipeConnection<TRead, TWrite> CreateConnection<TRead, TWrite>(PipeStream pipeStream)
+        public static NamedPipeConnection<TRead, TWrite> CreateConnection<TRead, TWrite>(PipeStream pipeStream, ICustomSerializer<TRead> serializerRead, ICustomSerializer<TWrite> serializerWrite)
             where TRead : class
             where TWrite : class
         {
-            return new NamedPipeConnection<TRead, TWrite>(++_lastId, "Client " + _lastId, pipeStream);
+            return new NamedPipeConnection<TRead, TWrite>(++_lastId, "Client " + _lastId, pipeStream, serializerRead, serializerWrite);
         }
     }
 

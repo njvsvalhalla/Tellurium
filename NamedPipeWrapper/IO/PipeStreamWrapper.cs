@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NamedPipeWrapper.Serialization;
+using System;
 using System.IO;
 using System.IO.Pipes;
 using System.Runtime.Serialization;
@@ -16,7 +17,8 @@ namespace NamedPipeWrapper.IO
         /// Constructs a new <c>PipeStreamWrapper</c> object that reads from and writes to the given <paramref name="stream"/>.
         /// </summary>
         /// <param name="stream">Stream to read from and write to</param>
-        public PipeStreamWrapper(PipeStream stream) : base(stream)
+        /// <param name="serializer">Serializer to use. Can be null to use the default serializer</param>
+        public PipeStreamWrapper(PipeStream stream, ICustomSerializer<TReadWrite> serializer) : base(stream, serializer, serializer)
         {
         }
     }
@@ -75,11 +77,13 @@ namespace NamedPipeWrapper.IO
         /// Constructs a new <c>PipeStreamWrapper</c> object that reads from and writes to the given <paramref name="stream"/>.
         /// </summary>
         /// <param name="stream">Stream to read from and write to</param>
-        public PipeStreamWrapper(PipeStream stream)
+        /// <param name="serializerRead">Serializer to use when reading. Can be null to use the default serializer</param>
+        /// <param name="serializerWrite">Serializer to use when writing. Can be null to use the default serializer</param>
+        public PipeStreamWrapper(PipeStream stream, ICustomSerializer<TRead> serializerRead, ICustomSerializer<TWrite> serializerWrite)
         {
             BaseStream = stream;
-            _reader = new PipeStreamReader<TRead>(BaseStream);
-            _writer = new PipeStreamWriter<TWrite>(BaseStream);
+            _reader = new PipeStreamReader<TRead>(BaseStream, serializerRead);
+            _writer = new PipeStreamWriter<TWrite>(BaseStream, serializerWrite);
         }
 
         /// <summary>

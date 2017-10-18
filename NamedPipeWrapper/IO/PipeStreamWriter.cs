@@ -1,9 +1,9 @@
+using NamedPipeWrapper.Serialization;
 using System;
 using System.IO;
 using System.IO.Pipes;
 using System.Net;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 
 namespace NamedPipeWrapper.IO
 {
@@ -19,28 +19,20 @@ namespace NamedPipeWrapper.IO
         /// </summary>
         public PipeStream BaseStream { get; private set; }
 
-        private readonly BinaryFormatter _binaryFormatter = new BinaryFormatter();
+        private readonly ICustomSerializer<T> _serializer;
 
         /// <summary>
         /// Constructs a new <c>PipeStreamWriter</c> object that writes to given <paramref name="stream"/>.
         /// </summary>
         /// <param name="stream">Pipe to write to</param>
-        public PipeStreamWriter(PipeStream stream)
+        /// <param name="serializer">Serializer to use. Can be null to use the default serializer</param>
+        public PipeStreamWriter(PipeStream stream, ICustomSerializer<T> serializer)
         {
             BaseStream = stream;
+            _serializer = serializer ?? new BinaryFormatterSerializer<T>();
         }
 
         #region Private stream writers
-
-        /// <exception cref="SerializationException">An object in the graph of type parameter <typeparamref name="T"/> is not marked as serializable.</exception>
-        private byte[] Serialize(T obj)
-        {
-            using (var memoryStream = new MemoryStream())
-            {
-                _binaryFormatter.Serialize(memoryStream, obj);
-                return memoryStream.ToArray();
-            }
-        }
 
         private void WriteLength(int len)
         {
@@ -67,7 +59,7 @@ namespace NamedPipeWrapper.IO
         /// <exception cref="SerializationException">An object in the graph of type parameter <typeparamref name="T"/> is not marked as serializable.</exception>
         public void WriteObject(T obj)
         {
-            var data = Serialize(obj);
+            var data = _serializer.Serialize(obj);
             WriteLength(data.Length);
             WriteObject(data);
             Flush();

@@ -1,9 +1,9 @@
-﻿using System;
+﻿using NamedPipeWrapper.Serialization;
+using System;
 using System.IO;
 using System.IO.Pipes;
 using System.Net;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 
 namespace NamedPipeWrapper.IO
 {
@@ -24,16 +24,18 @@ namespace NamedPipeWrapper.IO
         /// </summary>
         public bool IsConnected { get; private set; }
 
-        private readonly BinaryFormatter _binaryFormatter = new BinaryFormatter();
+        private readonly ICustomSerializer<T> _serializer;
 
         /// <summary>
         /// Constructs a new <c>PipeStreamReader</c> object that reads data from the given <paramref name="stream"/>.
         /// </summary>
         /// <param name="stream">Pipe to read from</param>
-        public PipeStreamReader(PipeStream stream)
+        /// <param name="serializer">Serializer to use. Can be null to use the default serializer</param>
+        public PipeStreamReader(PipeStream stream, ICustomSerializer<T> serializer)
         {
             BaseStream = stream;
             IsConnected = stream.IsConnected;
+            _serializer = serializer ?? new BinaryFormatterSerializer<T>();
         }
 
         #region Private stream readers
@@ -64,10 +66,7 @@ namespace NamedPipeWrapper.IO
         {
             var data = new byte[len];
             BaseStream.Read(data, 0, len);
-            using (var memoryStream = new MemoryStream(data))
-            {
-                return (T)_binaryFormatter.Deserialize(memoryStream);
-            }
+            return _serializer.Deserialize(data);
         }
 
         #endregion

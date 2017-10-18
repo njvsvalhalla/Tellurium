@@ -1,4 +1,5 @@
 ﻿using NamedPipeWrapper.IO;
+using NamedPipeWrapper.Serialization;
 using NamedPipeWrapper.Threading;
 using System;
 using System.Collections.Generic;
@@ -17,8 +18,9 @@ namespace NamedPipeWrapper
         /// Constructs a new <c>NamedPipeServer</c> object that listens for client connections on the given <paramref name="pipeName"/>.
         /// </summary>
         /// <param name="pipeName">Name of the pipe to listen on</param>
-        public NamedPipeServer(string pipeName)
-            : base(pipeName)
+        /// <param name="serializer">Serializer to use. Can be null to use the default serializer</param>
+        public NamedPipeServer(string pipeName, ICustomSerializer<TReadWrite> serializer = null)
+            : base(pipeName, serializer, serializer)
         {
         }
 
@@ -28,8 +30,9 @@ namespace NamedPipeWrapper
         /// <param name="pipeName">Name of the pipe to listen on</param>
         /// <param name="bufferSize">Size of input and output buffer</param>
         /// <param name="security">And object that determine the access control and audit security for the pipe</param>
-        public NamedPipeServer(string pipeName, int bufferSize, PipeSecurity security)
-            : base(pipeName, bufferSize, security)
+        /// <param name="serializer">Serializer to use. Can be null to use the default serializer</param>
+        public NamedPipeServer(string pipeName, int bufferSize, PipeSecurity security, ICustomSerializer<TReadWrite> serializer = null)
+            : base(pipeName, bufferSize, security, serializer, serializer)
         { }
     }
 
@@ -70,15 +73,21 @@ namespace NamedPipeWrapper
         private int _nextPipeId;
 
         private volatile bool _shouldKeepRunning;
-        private volatile bool _isRunning;
+
+        private readonly ICustomSerializer<TRead> _serializerRead;
+        private readonly ICustomSerializer<TWrite> _serializerWrite;
 
         /// <summary>
         /// Constructs a new <c>NamedPipeServer</c> object that listens for client connections on the given <paramref name="pipeName"/>.
         /// </summary>
         /// <param name="pipeName">Name of the pipe to listen on</param>
-        public NamedPipeServer(string pipeName)
+        /// <param name="serializerRead">Serializer to use when reading. Can be null to use the default serializer</param>
+        /// <param name="serializerWrite">Serializer to use when writing. Can be null to use the default serializer</param>
+        public NamedPipeServer(string pipeName, ICustomSerializer<TRead> serializerRead = null, ICustomSerializer<TWrite> serializerWrite = null)
         {
             _pipeName = pipeName;
+            _serializerRead = serializerRead;
+            _serializerWrite = serializerWrite;
         }
 
         /// <summary>
@@ -87,11 +96,15 @@ namespace NamedPipeWrapper
         /// <param name="pipeName">Name of the pipe to listen on</param>
         /// <param name="bufferSize">Size of input and output buffer</param>
         /// <param name="security">And object that determine the access control and audit security for the pipe</param>
-        public NamedPipeServer(string pipeName, int bufferSize, PipeSecurity security)
+        /// <param name="serializerRead">Serializer to use when reading. Can be null to use the default serializer</param>
+        /// <param name="serializerWrite">Serializer to use when writing. Can be null to use the default serializer</param>
+        public NamedPipeServer(string pipeName, int bufferSize, PipeSecurity security, ICustomSerializer<TRead> serializerRead = null, ICustomSerializer<TWrite> serializerWrite = null)
         {
             _pipeName = pipeName;
             _bufferSize = bufferSize;
             _security = security;
+            _serializerRead = serializerRead;
+            _serializerWrite = serializerWrite;
         }
 
         /// <summary>
@@ -236,7 +249,7 @@ namespace NamedPipeWrapper
             // This prevents the delays of 2+2 seconds in most scenarios.
 
             // this dummy connection will use the local server name.
-            var dummyClient = new NamedPipeClient<TRead, TWrite>(_pipeName, ".");
+            var dummyClient = new NamedPipeClient<TRead, TWrite>(_pipeName, ".", _serializerRead, _serializerWrite);
             dummyClient.Start();
             dummyClient.WaitForConnection(TimeSpan.FromSeconds(2));
 
@@ -258,9 +271,7 @@ namespace NamedPipeWrapper
 
         private void ListenSync()
         {
-            _isRunning = true;
             while (_shouldKeepRunning) { WaitForConnection(); }
-            _isRunning = false;
         }
 
         private void WaitForConnection()
@@ -275,7 +286,7 @@ namespace NamedPipeWrapper
             {
                 // Send the client the name of the data pipe to use
                 handshakePipe = CreateAndConnectPipe();
-                var handshakeWrapper = new PipeStreamWrapper<string, string>(handshakePipe);
+                var handshakeWrapper = new PipeStreamWrapper<string, string>(handshakePipe, StringUtf8Serializer.Instance, StringUtf8Serializer.Instance);
                 handshakeWrapper.WriteObject(connectionPipeName);
                 handshakeWrapper.WaitForPipeDrain();
                 handshakeWrapper.Close();
@@ -285,7 +296,7 @@ namespace NamedPipeWrapper
                 dataPipe.WaitForConnection();
 
                 // Add the client's connection to the list of connections
-                connection = ConnectionFactory.CreateConnection<TRead, TWrite>(dataPipe);
+                connection = ConnectionFactory.CreateConnection<TRead, TWrite>(dataPipe, _serializerRead, _serializerWrite);
                 connection.ReceiveMessage += ClientOnReceiveMessage;
                 connection.Disconnected += ClientOnDisconnected;
                 connection.Error += ConnectionOnError;

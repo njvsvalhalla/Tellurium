@@ -1,4 +1,5 @@
 ﻿using NamedPipeWrapper.IO;
+using NamedPipeWrapper.Serialization;
 using NamedPipeWrapper.Threading;
 using System;
 using System.IO;
@@ -15,11 +16,21 @@ namespace NamedPipeWrapper
     public class NamedPipeClient<TReadWrite> : NamedPipeClient<TReadWrite, TReadWrite> where TReadWrite : class
     {
         /// <summary>
-        /// Constructs a new <c>NamedPipeClient</c> to connect to the <see cref="NamedPipeNamedPipeServer{TReadWrite}"/> specified by <paramref name="pipeName"/>.
+        /// Constructs a new <c>NamedPipeClient</c> to connect to the <see cref="NamedPipeServer{TReadWrite}"/> specified by <paramref name="pipeName"/>.
+        /// </summary>
+        /// <param name="pipeName">Name of the server's pipe</param>
+        /// <param name="serializer">Serializer to use. Can be null to use the default serializer</param>
+        public NamedPipeClient(string pipeName, ICustomSerializer<TReadWrite> serializer = null) : base(pipeName, ".", serializer, serializer)
+        {
+        }
+
+        /// <summary>
+        /// Constructs a new <c>NamedPipeClient</c> to connect to the <see cref="NamedPipeServer{TReadWrite}"/> specified by <paramref name="pipeName"/>.
         /// </summary>
         /// <param name="pipeName">Name of the server's pipe</param>
         /// <param name="serverName">Server name. By default, "." (local).</param>
-        public NamedPipeClient(string pipeName, string serverName = ".") : base(pipeName, serverName)
+        /// <param name="serializer">Serializer to use. Can be null to use the default serializer</param>
+        public NamedPipeClient(string pipeName, string serverName, ICustomSerializer<TReadWrite> serializer = null) : base(pipeName, serverName, serializer, serializer)
         {
         }
     }
@@ -58,15 +69,22 @@ namespace NamedPipeWrapper
         private CancellationTokenSource _ctsCancelConnect;
         private readonly string _serverName;
 
+        private readonly ICustomSerializer<TRead> _serializerRead;
+        private readonly ICustomSerializer<TWrite> _serializerWrite;
+
         /// <summary>
         /// Constructs a new <c>NamedPipeClient</c> to connect to the <see cref="NamedPipeServer{TRead, TWrite}"/> specified by <paramref name="pipeName"/>.
         /// </summary>
         /// <param name="pipeName">Name of the server's pipe</param>
         /// <param name="serverName">Server name. Use "." for the local machine.</param>
-        public NamedPipeClient(string pipeName, string serverName)
+        /// <param name="serializerRead">Serializer to use when reading. Can be null to use the default serializer</param>
+        /// <param name="serializerWrite">Serializer to use when writing. Can be null to use the default serializer</param>
+        public NamedPipeClient(string pipeName, string serverName, ICustomSerializer<TRead> serializerRead = null, ICustomSerializer<TWrite> serializerWrite = null)
         {
             _pipeName = pipeName;
             _serverName = serverName;
+            _serializerRead = serializerRead;
+            _serializerWrite = serializerWrite;
         }
 
         /// <summary>
@@ -173,7 +191,7 @@ namespace NamedPipeWrapper
         private void ListenSync()
         {
             // Get the name of the data pipe that should be used from now on by this NamedPipeClient
-            var handshake = PipeClientFactory.Connect<string, string>(_pipeName, _serverName, _ctsCancelConnect.Token);
+            var handshake = PipeClientFactory.Connect<string, string>(_pipeName, _serverName, StringUtf8Serializer.Instance, StringUtf8Serializer.Instance, _ctsCancelConnect.Token);
             if (handshake == null) { return; }
             var dataPipeName = handshake.ReadObject();
             handshake.Close();
@@ -183,7 +201,7 @@ namespace NamedPipeWrapper
             if (dataPipe == null) { return; }
 
             // Create a Connection object for the data pipe
-            _connection = ConnectionFactory.CreateConnection<TRead, TWrite>(dataPipe);
+            _connection = ConnectionFactory.CreateConnection<TRead, TWrite>(dataPipe, _serializerRead, _serializerWrite);
             _connection.Disconnected += OnDisconnected;
             _connection.ReceiveMessage += OnReceiveMessage;
             _connection.Error += ConnectionOnError;
@@ -249,13 +267,13 @@ namespace NamedPipeWrapper
                 }
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return false;
             }
         }
 
-        public static PipeStreamWrapper<TRead, TWrite> Connect<TRead, TWrite>(string pipeName, string serverName, CancellationToken cancelToken)
+        public static PipeStreamWrapper<TRead, TWrite> Connect<TRead, TWrite>(string pipeName, string serverName, ICustomSerializer<TRead> serializerRead, ICustomSerializer<TWrite> serializerWrite, CancellationToken cancelToken)
             where TRead : class
             where TWrite : class
         {
@@ -264,7 +282,7 @@ namespace NamedPipeWrapper
             {
                 return null;
             }
-            return new PipeStreamWrapper<TRead, TWrite>(inner);
+            return new PipeStreamWrapper<TRead, TWrite>(inner, serializerRead, serializerWrite);
         }
 
         public static NamedPipeClientStream CreateAndConnectPipe(string pipeName, string serverName, CancellationToken cancelToken, int timeout = 10)
