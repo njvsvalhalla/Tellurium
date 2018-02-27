@@ -1,18 +1,21 @@
-﻿using NamedPipeWrapper.IO;
-using NamedPipeWrapper.Serialization;
-using NamedPipeWrapper.Threading;
-using System;
-using System.IO;
-using System.IO.Pipes;
-using System.Runtime.InteropServices;
-using System.Threading;
-
-namespace NamedPipeWrapper
+﻿namespace NamedPipeWrapper
 {
+    using System;
+    using System.IO;
+    using System.IO.Pipes;
+    using System.Runtime.InteropServices;
+    using System.Threading;
+
+    using IO;
+    using JetBrains.Annotations;
+    using Serialization;
+    using Threading;
+
     /// <summary>
     /// Wraps a <see cref="NamedPipeClientStream"/>.
     /// </summary>
     /// <typeparam name="TReadWrite">Reference type to read from and write to the named pipe</typeparam>
+    [PublicAPI]
     public class NamedPipeClient<TReadWrite> : NamedPipeClient<TReadWrite, TReadWrite> where TReadWrite : class
     {
         /// <summary>
@@ -40,6 +43,7 @@ namespace NamedPipeWrapper
     /// </summary>
     /// <typeparam name="TRead">Reference type to read from the named pipe</typeparam>
     /// <typeparam name="TWrite">Reference type to write to the named pipe</typeparam>
+    [PublicAPI]
     public class NamedPipeClient<TRead, TWrite>
         where TRead : class
         where TWrite : class
@@ -104,12 +108,7 @@ namespace NamedPipeWrapper
         ///     Sends a message to the server over a named pipe.
         /// </summary>
         /// <param name="message">Message to send to the server.</param>
-        public void PushMessage(TWrite message)
-        {
-            if (_connection != null)
-                _connection.PushMessage(message);
-        }
-
+        public void PushMessage(TWrite message) => _connection?.PushMessage(message);
         /// <summary>
         /// Closes the named pipe.
         /// </summary>
@@ -117,8 +116,7 @@ namespace NamedPipeWrapper
         {
             _ctsCancelConnect.Cancel();
             _closedExplicitly = true;
-            if (_connection != null)
-                _connection.Close();
+            _connection?.Close();
         }
 
         #region Wait for connection/disconnection
@@ -127,62 +125,36 @@ namespace NamedPipeWrapper
         /// Waits until the connection has been established, and returns true.
         /// Returns false if the connection has not and will not happen.
         /// </summary>
-        public bool WaitForConnection()
-        {
-            var response = WaitHandle.WaitAny(new[] { _connected, _ctsCancelConnect.Token.WaitHandle });
-            return response == 0;
-        }
-
+        public bool WaitForConnection() => WaitHandle.WaitAny(new[] { _connected, _ctsCancelConnect.Token.WaitHandle }) == 0;
         /// <summary>
         /// Waits until the connection has been established or until the timeout, and returns true if the connection has been established.
         /// Returns false if the connection is not established after the timeout.
         /// </summary>
-        public bool WaitForConnection(int millisecondsTimeout)
-        {
-            var response = WaitHandle.WaitAny(new[] { _connected, _ctsCancelConnect.Token.WaitHandle }, millisecondsTimeout);
-            return response == 0;
-        }
-
+        public bool WaitForConnection(int millisecondsTimeout) => WaitHandle.WaitAny(new[] { _connected, _ctsCancelConnect.Token.WaitHandle }, millisecondsTimeout) == 0;
         /// <summary>
         /// Waits until the connection has been established or until the timeout, and returns true if the connection has been established.
         /// Returns false if the connection is not established after the timeout.
         /// </summary>
-        public bool WaitForConnection(TimeSpan timeout)
-        {
-            var response = WaitHandle.WaitAny(new[] { _connected, _ctsCancelConnect.Token.WaitHandle }, timeout);
-            return response == 0;
-        }
-
+        public bool WaitForConnection(TimeSpan timeout) => WaitHandle.WaitAny(new[] { _connected, _ctsCancelConnect.Token.WaitHandle }, timeout) == 0;
         /// <summary>
         /// Waits until the disconnection has been completed, and returns true.
         /// Returns false if the connection was not established, or if the disconnection has not and will not happen.
         /// </summary>
         public bool WaitForDisconnection()
         {
-            if (_connection == null) { return true; }
-            var response = WaitHandle.WaitAny(new[] { _disconnected, _ctsCancelConnect.Token.WaitHandle });
-            return response == 0;
+            if (_connection == null) return true;
+            return WaitHandle.WaitAny(new[] { _disconnected, _ctsCancelConnect.Token.WaitHandle }) == 0;
         }
-
         /// <summary>
         /// Waits until the disconnection has been completed or until the timeout, and returns true if the disconnection has been completed.
         /// Returns false if the connection was not established, or if the disconnection has not and will not happen.
         /// </summary>
-        public bool WaitForDisconnection(int millisecondsTimeout)
-        {
-            var response = WaitHandle.WaitAny(new[] { _disconnected, _ctsCancelConnect.Token.WaitHandle }, millisecondsTimeout);
-            return response == 0;
-        }
-
+        public bool WaitForDisconnection(int millisecondsTimeout) => WaitHandle.WaitAny(new[] { _disconnected, _ctsCancelConnect.Token.WaitHandle }, millisecondsTimeout) == 0;
         /// <summary>
         /// Waits until the disconnection has been completed or until the timeout, and returns true if the disconnection has been completed.
         /// Returns false if the connection was not established, or if the disconnection has not and will not happen.
         /// </summary>
-        public bool WaitForDisconnection(TimeSpan timeout)
-        {
-            var response = WaitHandle.WaitAny(new[] { _disconnected, _ctsCancelConnect.Token.WaitHandle }, timeout);
-            return response == 0;
-        }
+        public bool WaitForDisconnection(TimeSpan timeout) => WaitHandle.WaitAny(new[] { _disconnected, _ctsCancelConnect.Token.WaitHandle }, timeout) == 0;
 
         #endregion
 
@@ -214,58 +186,36 @@ namespace NamedPipeWrapper
         {
             // set before, so that if the eventhandler wants to connect again, the order of the events is still correct
             _disconnected.Set();
-
-            if (Disconnected != null)
-                Disconnected(connection, _closedExplicitly);
+            Disconnected?.Invoke(connection, _closedExplicitly);
         }
-
-        private void OnReceiveMessage(NamedPipeConnection<TRead, TWrite> connection, TRead message)
-        {
-            if (ServerMessage != null)
-                ServerMessage(connection, message);
-        }
-
+        private void OnReceiveMessage(NamedPipeConnection<TRead, TWrite> connection, TRead message) => ServerMessage?.Invoke(connection, message);
         /// <summary>
         ///     Invoked on the UI thread.
         /// </summary>
-        private void ConnectionOnError(NamedPipeConnection<TRead, TWrite> connection, Exception exception)
-        {
-            OnError(exception);
-        }
-
+        private void ConnectionOnError(NamedPipeConnection<TRead, TWrite> connection, Exception exception) => OnError(exception);
         /// <summary>
         ///     Invoked on the UI thread.
         /// </summary>
         /// <param name="exception"></param>
-        private void OnError(Exception exception)
-        {
-            if (Error != null)
-                Error(exception);
-        }
+        private void OnError(Exception exception) => Error?.Invoke(exception);
 
         #endregion
     }
-
-    static class PipeClientFactory
+    [UsedImplicitly]
+    internal static class PipeClientFactory
     {
         [return: MarshalAs(UnmanagedType.Bool)]
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern bool WaitNamedPipe(string name, int timeout);
 
-        public static bool NamedPipeExists(string pipeName)
+        private static bool NamedPipeExists(string pipeName)
         {
             try
             {
-                bool exists = WaitNamedPipe(pipeName, 0);
-                if (!exists)
-                {
-                    int error = Marshal.GetLastWin32Error();
-                    if (error == 0 || error == 2)
-                    {
-                        return false;
-                    }
-                }
-                return true;
+                var exists = WaitNamedPipe(pipeName, 0);
+                if (exists) return true;
+                var error = Marshal.GetLastWin32Error();
+                return error != 0 && error != 2;
             }
             catch (Exception)
             {
@@ -278,29 +228,18 @@ namespace NamedPipeWrapper
             where TWrite : class
         {
             var inner = CreateAndConnectPipe(pipeName, serverName, cancelToken);
-            if (inner == null)
-            {
-                return null;
-            }
-            return new PipeStreamWrapper<TRead, TWrite>(inner, serializerRead, serializerWrite);
+            return inner == null ? null : new PipeStreamWrapper<TRead, TWrite>(inner, serializerRead, serializerWrite);
         }
-
         public static NamedPipeClientStream CreateAndConnectPipe(string pipeName, string serverName, CancellationToken cancelToken, int timeout = 10)
         {
-            string normalizedPath = Path.GetFullPath(string.Format(@"\\{1}\pipe\{0}", pipeName, serverName));
+            var normalizedPath = Path.GetFullPath(string.Format(@"\\{1}\pipe\{0}", pipeName, serverName));
             while (!cancelToken.IsCancellationRequested && !NamedPipeExists(normalizedPath))
-            {
                 Thread.Sleep(timeout);
-            }
             if (cancelToken.IsCancellationRequested) { return null; }
             var pipe = CreatePipe(pipeName, serverName);
             pipe.Connect(1000);
             return pipe;
         }
-
-        private static NamedPipeClientStream CreatePipe(string pipeName, string serverName)
-        {
-            return new NamedPipeClientStream(serverName, pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
-        }
+        private static NamedPipeClientStream CreatePipe(string pipeName, string serverName) => new NamedPipeClientStream(serverName, pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
     }
 }

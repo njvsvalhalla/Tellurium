@@ -1,20 +1,22 @@
-﻿using NamedPipeWrapper.Serialization;
-using System;
-using System.IO;
-using System.IO.Pipes;
-using System.Runtime.Serialization;
-
-namespace NamedPipeWrapper.IO
+﻿namespace NamedPipeWrapper.IO
 {
+    using System;
+    using System.IO;
+    using System.IO.Pipes;
+    using System.Runtime.Serialization;
+    using Serialization;
+
+    /// <inheritdoc />
     /// <summary>
-    /// Wraps a <see cref="PipeStream"/> object to read and write .NET CLR objects.
+    /// Wraps a <see cref="T:System.IO.Pipes.PipeStream" /> object to read and write .NET CLR objects.
     /// </summary>
     /// <typeparam name="TReadWrite">Reference type to read from and write to the pipe</typeparam>
     public class PipeStreamWrapper<TReadWrite> : PipeStreamWrapper<TReadWrite, TReadWrite>
         where TReadWrite : class
     {
+        /// <inheritdoc />
         /// <summary>
-        /// Constructs a new <c>PipeStreamWrapper</c> object that reads from and writes to the given <paramref name="stream"/>.
+        /// Constructs a new <c>PipeStreamWrapper</c> object that reads from and writes to the given <paramref name="stream" />.
         /// </summary>
         /// <param name="stream">Stream to read from and write to</param>
         /// <param name="serializer">Serializer to use. Can be null to use the default serializer</param>
@@ -35,7 +37,7 @@ namespace NamedPipeWrapper.IO
         /// <summary>
         /// Gets the underlying <c>PipeStream</c> object.
         /// </summary>
-        public PipeStream BaseStream { get; private set; }
+        private PipeStream BaseStream { get; set; }
 
         /// <summary>
         ///     Gets a value indicating whether the <see cref="BaseStream"/> object is connected or not.
@@ -43,10 +45,7 @@ namespace NamedPipeWrapper.IO
         /// <returns>
         ///     <c>true</c> if the <see cref="BaseStream"/> object is connected; otherwise, <c>false</c>.
         /// </returns>
-        public bool IsConnected
-        {
-            get { return BaseStream.IsConnected && _reader.IsConnected; }
-        }
+        public bool IsConnected => BaseStream.IsConnected && _reader.IsConnected;
 
         /// <summary>
         ///     Gets a value indicating whether the current stream supports read operations.
@@ -54,10 +53,7 @@ namespace NamedPipeWrapper.IO
         /// <returns>
         ///     <c>true</c> if the stream supports read operations; otherwise, <c>false</c>.
         /// </returns>
-        public bool CanRead
-        {
-            get { return BaseStream.CanRead; }
-        }
+        public bool CanRead => BaseStream.CanRead;
 
         /// <summary>
         ///     Gets a value indicating whether the current stream supports write operations.
@@ -65,10 +61,7 @@ namespace NamedPipeWrapper.IO
         /// <returns>
         ///     <c>true</c> if the stream supports write operations; otherwise, <c>false</c>.
         /// </returns>
-        public bool CanWrite
-        {
-            get { return BaseStream.CanWrite; }
-        }
+        public bool CanWrite => BaseStream.CanWrite;
 
         private readonly PipeStreamReader<TRead> _reader;
         private readonly PipeStreamWriter<TWrite> _writer;
@@ -92,20 +85,14 @@ namespace NamedPipeWrapper.IO
         /// </summary>
         /// <returns>The next object read from the pipe, or <c>null</c> if the pipe disconnected.</returns>
         /// <exception cref="SerializationException">An object in the graph of type parameter <typeparamref name="TRead"/> is not marked as serializable.</exception>
-        public TRead ReadObject()
-        {
-            return _reader.ReadObject();
-        }
+        public TRead ReadObject() => _reader.ReadObject();
 
         /// <summary>
         /// Writes an object to the pipe.  This method blocks until all data is sent.
         /// </summary>
         /// <param name="obj">Object to write to the pipe</param>
         /// <exception cref="SerializationException">An object in the graph of type parameter <typeparamref name="TRead"/> is not marked as serializable.</exception>
-        public void WriteObject(TWrite obj)
-        {
-            _writer.WriteObject(obj);
-        }
+        public void WriteObject(TWrite obj) => _writer.WriteObject(obj);
 
         /// <summary>
         ///     Waits for the other end of the pipe to read all sent bytes.
@@ -113,17 +100,11 @@ namespace NamedPipeWrapper.IO
         /// <exception cref="ObjectDisposedException">The pipe is closed.</exception>
         /// <exception cref="NotSupportedException">The pipe does not support write operations.</exception>
         /// <exception cref="IOException">The pipe is broken or another I/O error occurred.</exception>
-        public void WaitForPipeDrain()
-        {
-            _writer.WaitForPipeDrain();
-        }
+        public void WaitForPipeDrain() => _writer.WaitForPipeDrain();
 
         /// <summary>
         ///     Closes the current stream and releases any resources (such as sockets and file handles) associated with the current stream.
         /// </summary>
-        public void Close()
-        {
-            BaseStream.Close();
-        }
+        public void Close() => BaseStream.Close();
     }
 }

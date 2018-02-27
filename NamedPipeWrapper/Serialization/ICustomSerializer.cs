@@ -1,7 +1,7 @@
-using System.Runtime.Serialization;
-
 namespace NamedPipeWrapper.Serialization
 {
+    using System.Runtime.Serialization;
+
     /// <summary>
     /// An object that will serialize and deserialize the data passing through the pipe.
     /// </summary>

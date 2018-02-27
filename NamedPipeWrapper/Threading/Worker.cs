@@ -1,22 +1,16 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace NamedPipeWrapper.Threading
+﻿namespace NamedPipeWrapper.Threading
 {
-    class Worker
+    using System;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    internal class Worker
     {
         private readonly TaskScheduler _callbackThread;
 
-        private static TaskScheduler CurrentTaskScheduler
-        {
-            get
-            {
-                return (SynchronizationContext.Current != null
-                            ? TaskScheduler.FromCurrentSynchronizationContext()
-                            : TaskScheduler.Default);
-            }
-        }
+        private static TaskScheduler CurrentTaskScheduler => (SynchronizationContext.Current != null
+            ? TaskScheduler.FromCurrentSynchronizationContext()
+            : TaskScheduler.Default);
 
         public event WorkerSucceededEventHandler Succeeded;
         public event WorkerExceptionEventHandler Error;
@@ -25,10 +19,7 @@ namespace NamedPipeWrapper.Threading
         {
         }
 
-        public Worker(TaskScheduler callbackThread)
-        {
-            _callbackThread = callbackThread;
-        }
+        private Worker(TaskScheduler callbackThread) => _callbackThread = callbackThread;
 
         public void DoWork(Action action)
         {
@@ -49,22 +40,11 @@ namespace NamedPipeWrapper.Threading
             }
         }
 
-        private void Succeed()
-        {
-            if (Succeeded != null)
-                Succeeded();
-        }
+        private void Succeed() => Succeeded?.Invoke();
 
-        private void Fail(Exception exception)
-        {
-            if (Error != null)
-                Error(exception);
-        }
+        private void Fail(Exception exception) => Error?.Invoke(exception);
 
-        private void Callback(Action action)
-        {
-            Task.Factory.StartNew(action, CancellationToken.None, TaskCreationOptions.None, _callbackThread);
-        }
+        private void Callback(Action action) => Task.Factory.StartNew(action, CancellationToken.None, TaskCreationOptions.None, _callbackThread);
     }
 
     internal delegate void WorkerSucceededEventHandler();

@@ -1,8 +1,8 @@
-﻿using System;
-using System.Text;
-
-namespace NamedPipeWrapper.Serialization
+﻿namespace NamedPipeWrapper.Serialization
 {
+    using System.Text;
+
+    /// <inheritdoc />
     /// <summary>
     /// Serializer that serializes strings as UTF8.
     /// </summary>
@@ -14,15 +14,9 @@ namespace NamedPipeWrapper.Serialization
         public static readonly StringUtf8Serializer Instance = new StringUtf8Serializer();
 
         /// <inheritdoc />
-        public byte[] Serialize(string obj)
-        {
-            return Encoding.UTF8.GetBytes(obj);
-        }
+        public byte[] Serialize(string obj) => Encoding.UTF8.GetBytes(obj);
 
         /// <inheritdoc />
-        public string Deserialize(byte[] data)
-        {
-            return Encoding.UTF8.GetString(data);
-        }
+        public string Deserialize(byte[] data) => Encoding.UTF8.GetString(data);
     }
 }

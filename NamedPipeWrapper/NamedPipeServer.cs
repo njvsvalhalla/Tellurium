@@ -1,17 +1,20 @@
-﻿using NamedPipeWrapper.IO;
-using NamedPipeWrapper.Serialization;
-using NamedPipeWrapper.Threading;
-using System;
-using System.Collections.Generic;
-using System.IO.Pipes;
-using System.Linq;
-
-namespace NamedPipeWrapper
+﻿namespace NamedPipeWrapper
 {
+    using System;
+    using System.Collections.Generic;
+    using System.IO.Pipes;
+    using System.Linq;
+    using IO;
+    using JetBrains.Annotations;
+    using Serialization;
+    using Threading;
+
+    /// <inheritdoc />
     /// <summary>
-    /// Wraps a <see cref="NamedPipeServerStream"/> and provides multiple simultaneous client connection handling.
+    /// Wraps a <see cref="T:System.IO.Pipes.NamedPipeServerStream" /> and provides multiple simultaneous client connection handling.
     /// </summary>
     /// <typeparam name="TReadWrite">Reference type to read from and write to the named pipe</typeparam>
+    [PublicAPI]
     public class NamedPipeServer<TReadWrite> : NamedPipeServer<TReadWrite, TReadWrite> where TReadWrite : class
     {
         /// <summary>
@@ -83,7 +86,7 @@ namespace NamedPipeWrapper
         /// <param name="pipeName">Name of the pipe to listen on</param>
         /// <param name="serializerRead">Serializer to use when reading. Can be null to use the default serializer</param>
         /// <param name="serializerWrite">Serializer to use when writing. Can be null to use the default serializer</param>
-        public NamedPipeServer(string pipeName, ICustomSerializer<TRead> serializerRead = null, ICustomSerializer<TWrite> serializerWrite = null)
+        protected NamedPipeServer(string pipeName, ICustomSerializer<TRead> serializerRead = null, ICustomSerializer<TWrite> serializerWrite = null)
         {
             _pipeName = pipeName;
             _serializerRead = serializerRead;
@@ -98,7 +101,7 @@ namespace NamedPipeWrapper
         /// <param name="security">And object that determine the access control and audit security for the pipe</param>
         /// <param name="serializerRead">Serializer to use when reading. Can be null to use the default serializer</param>
         /// <param name="serializerWrite">Serializer to use when writing. Can be null to use the default serializer</param>
-        public NamedPipeServer(string pipeName, int bufferSize, PipeSecurity security, ICustomSerializer<TRead> serializerRead = null, ICustomSerializer<TWrite> serializerWrite = null)
+        protected NamedPipeServer(string pipeName, int bufferSize, PipeSecurity security, ICustomSerializer<TRead> serializerRead = null, ICustomSerializer<TWrite> serializerWrite = null)
         {
             _pipeName = pipeName;
             _bufferSize = bufferSize;
@@ -148,11 +151,9 @@ namespace NamedPipeWrapper
                 // Can we speed this up with Linq or does that add overhead?
                 foreach (var client in _connections)
                 {
-                    if (client.Id == targetId)
-                    {
-                        client.PushMessage(message);
-                        break;
-                    }
+                    if (client.Id != targetId) continue;
+                    client.PushMessage(message);
+                    break;
                 }
             }
         }
@@ -169,27 +170,17 @@ namespace NamedPipeWrapper
             {
                 // Can we speed this up with Linq or does that add overhead?
                 foreach (var client in _connections)
-                {
-                    if (targetIds.Contains(client.Id))
-                    {
-                        client.PushMessage(message);
-                    }
-                }
+                if (targetIds.Contains(client.Id))
+                    client.PushMessage(message);
             }
         }
-
-
         /// <summary>
         /// Sends a message to a specific clients asynchronously.
         /// This method returns immediately, possibly before the message has been sent to all clients.
         /// </summary>
         /// <param name="message"></param>
         /// <param name="targetIds">An array of client ID's to send to.</param>
-        public void PushMessage(TWrite message, int[] targetIds)
-        {
-            PushMessage(message, targetIds.ToList());
-        }
-
+        public void PushMessage(TWrite message, IEnumerable<int> targetIds) => PushMessage(message, targetIds.ToList());
         /// <summary>
         /// Sends a message to a specific client asynchronously.
         /// This method returns immediately, possibly before the message has been sent to all clients.
@@ -203,11 +194,9 @@ namespace NamedPipeWrapper
                 // Can we speed this up with Linq or does that add overhead?
                 foreach (var client in _connections)
                 {
-                    if (client.Name.Equals(targetName))
-                    {
-                        client.PushMessage(message);
-                        break;
-                    }
+                    if (!client.Name.Equals(targetName)) continue;
+                    client.PushMessage(message);
+                    break;
                 }
             }
         }
@@ -332,17 +321,9 @@ namespace NamedPipeWrapper
                 : PipeServerFactory.CreatePipe(connectionPipeName, _bufferSize, _security);
         }
 
-        private void ClientOnConnected(NamedPipeConnection<TRead, TWrite> connection)
-        {
-            if (ClientConnected != null)
-                ClientConnected(connection);
-        }
+        private void ClientOnConnected(NamedPipeConnection<TRead, TWrite> connection) => ClientConnected?.Invoke(connection);
 
-        private void ClientOnReceiveMessage(NamedPipeConnection<TRead, TWrite> connection, TRead message)
-        {
-            if (ClientMessage != null)
-                ClientMessage(connection, message);
-        }
+        private void ClientOnReceiveMessage(NamedPipeConnection<TRead, TWrite> connection, TRead message) => ClientMessage?.Invoke(connection, message);
 
         private void ClientOnDisconnected(NamedPipeConnection<TRead, TWrite> connection)
         {
@@ -354,8 +335,7 @@ namespace NamedPipeWrapper
                 _connections.Remove(connection);
             }
 
-            if (ClientDisconnected != null)
-                ClientDisconnected(connection);
+            ClientDisconnected?.Invoke(connection);
         }
 
         /// <summary>
@@ -370,24 +350,14 @@ namespace NamedPipeWrapper
         ///     Invoked on the UI thread.
         /// </summary>
         /// <param name="exception"></param>
-        private void OnError(Exception exception)
-        {
-            if (Error != null)
-                Error(exception);
-        }
+        private void OnError(Exception exception) => Error?.Invoke(exception);
 
-        private string GetNextConnectionPipeName()
-        {
-            return string.Format("{0}_{1}", _pipeName, ++_nextPipeId);
-        }
+        private string GetNextConnectionPipeName() => string.Format("{0}_{1}", _pipeName, ++_nextPipeId);
 
         private static void Cleanup(NamedPipeServerStream pipe)
         {
             if (pipe == null) return;
-            using (var x = pipe)
-            {
-                x.Close();
-            }
+            using (var x = pipe) x.Close();
         }
 
         #endregion

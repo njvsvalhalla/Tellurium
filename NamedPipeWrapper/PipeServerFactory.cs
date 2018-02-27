@@ -1,8 +1,8 @@
-﻿using System.IO.Pipes;
-
-namespace NamedPipeWrapper
+﻿namespace NamedPipeWrapper
 {
-    static class PipeServerFactory
+    using System.IO.Pipes;
+
+    internal static class PipeServerFactory
     {
         public static NamedPipeServerStream CreateAndConnectPipe(string pipeName)
         {
@@ -12,22 +12,17 @@ namespace NamedPipeWrapper
             return pipe;
         }
 
-        public static NamedPipeServerStream CreatePipe(string pipeName)
-        {
-            return new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
-        }
+        public static NamedPipeServerStream CreatePipe(string pipeName) 
+            => new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
         public static NamedPipeServerStream CreateAndConnectPipe(string pipeName, int bufferSize, PipeSecurity security)
         {
             var pipe = CreatePipe(pipeName, bufferSize, security);
             pipe.WaitForConnection();
-
             return pipe;
         }
 
-        public static NamedPipeServerStream CreatePipe(string pipeName, int bufferSize, PipeSecurity security)
-        {
-            return new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.WriteThrough, bufferSize, bufferSize, security);
-        }
+        public static NamedPipeServerStream CreatePipe(string pipeName, int bufferSize, PipeSecurity security) 
+            => new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.WriteThrough, bufferSize, bufferSize, security);
     }
 }

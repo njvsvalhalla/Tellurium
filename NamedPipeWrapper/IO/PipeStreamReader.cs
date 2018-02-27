@@ -17,7 +17,7 @@ namespace NamedPipeWrapper.IO
         /// <summary>
         /// Gets the underlying <c>PipeStream</c> object.
         /// </summary>
-        public PipeStream BaseStream { get; private set; }
+        private PipeStream BaseStream { get; set; }
 
         /// <summary>
         /// Gets a value indicating whether the pipe is connected or not.

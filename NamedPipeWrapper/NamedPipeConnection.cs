@@ -1,19 +1,21 @@
-﻿using NamedPipeWrapper.IO;
-using NamedPipeWrapper.Threading;
-using System;
-using System.Collections.Concurrent;
-using System.IO.Pipes;
-using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
-using NamedPipeWrapper.Serialization;
-
-namespace NamedPipeWrapper
+﻿namespace NamedPipeWrapper
 {
+    using System;
+    using System.Collections.Concurrent;
+    using System.IO.Pipes;
+    using System.Runtime.InteropServices;
+    using System.Runtime.Serialization;
+    using IO;
+    using JetBrains.Annotations;
+    using Serialization;
+    using Threading;
+
     /// <summary>
     /// Represents a connection between a named pipe client and server.
     /// </summary>
     /// <typeparam name="TRead">Reference type to read from the named pipe</typeparam>
     /// <typeparam name="TWrite">Reference type to write to the named pipe</typeparam>
+    [PublicAPI]
     public class NamedPipeConnection<TRead, TWrite>
         where TRead : class
         where TWrite : class
@@ -36,7 +38,7 @@ namespace NamedPipeWrapper
         /// <summary>
         /// Gets a value indicating whether the pipe is connected or not.
         /// </summary>
-        public bool IsConnected { get { return _streamWrapper.IsConnected; } }
+        public bool IsConnected => _streamWrapper.IsConnected;
 
         /// <summary>
         /// Invoked when the named pipe connection terminates.
@@ -91,19 +93,11 @@ namespace NamedPipeWrapper
         /// Note: this method is thread-safe: multiple threads might call this method concurrently.
         /// </summary>
         /// <param name="message"></param>
-        public void PushMessage(TWrite message)
-        {
-            _writeQueue.Add(message);
-        }
-
+        public void PushMessage(TWrite message) => _writeQueue.Add(message);
         /// <summary>
         /// Closes the named pipe connection and underlying <c>PipeStream</c>.
         /// </summary>
-        public void Close()
-        {
-            CloseImpl();
-        }
-
+        public void Close() => CloseImpl();
         /// <summary>
         ///     Invoked on the background thread.
         /// </summary>
@@ -112,7 +106,6 @@ namespace NamedPipeWrapper
             _streamWrapper.Close();
             _writeQueue.CompleteAdding();
         }
-
         /// <summary>
         ///     Invoked on the UI thread.
         /// </summary>
@@ -124,19 +117,14 @@ namespace NamedPipeWrapper
 
             _notifiedSucceeded = true;
 
-            if (Disconnected != null)
-                Disconnected(this);
+            Disconnected?.Invoke(this);
         }
 
         /// <summary>
         ///     Invoked on the UI thread.
         /// </summary>
         /// <param name="exception"></param>
-        private void OnError(Exception exception)
-        {
-            if (Error != null)
-                Error(this, exception);
-        }
+        private void OnError(Exception exception) => Error?.Invoke(this, exception);
 
         /// <summary>
         ///     Invoked on the background thread.
@@ -152,8 +140,7 @@ namespace NamedPipeWrapper
                     CloseImpl();
                     return;
                 }
-                if (ReceiveMessage != null)
-                    ReceiveMessage(this, obj);
+                ReceiveMessage?.Invoke(this, obj);
             }
         }
 
@@ -186,16 +173,14 @@ namespace NamedPipeWrapper
         }
     }
 
-    static class ConnectionFactory
+    internal static class ConnectionFactory
     {
         private static int _lastId;
 
         public static NamedPipeConnection<TRead, TWrite> CreateConnection<TRead, TWrite>(PipeStream pipeStream, ICustomSerializer<TRead> serializerRead, ICustomSerializer<TWrite> serializerWrite)
             where TRead : class
-            where TWrite : class
-        {
-            return new NamedPipeConnection<TRead, TWrite>(++_lastId, "Client " + _lastId, pipeStream, serializerRead, serializerWrite);
-        }
+            where TWrite : class 
+        => new NamedPipeConnection<TRead, TWrite>(++_lastId, "Client " + _lastId, pipeStream, serializerRead, serializerWrite);
     }
 
     /// <summary>

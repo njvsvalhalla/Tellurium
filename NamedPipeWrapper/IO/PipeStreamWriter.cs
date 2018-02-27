@@ -1,12 +1,12 @@
-using NamedPipeWrapper.Serialization;
-using System;
-using System.IO;
-using System.IO.Pipes;
-using System.Net;
-using System.Runtime.Serialization;
-
 namespace NamedPipeWrapper.IO
 {
+    using System;
+    using System.IO;
+    using System.IO.Pipes;
+    using System.Net;
+    using System.Runtime.Serialization;
+    using Serialization;
+
     /// <summary>
     /// Wraps a <see cref="PipeStream"/> object and writes to it.  Serializes .NET CLR objects specified by <typeparamref name="T"/>
     /// into binary form and sends them over the named pipe for a <see cref="PipeStreamWriter{T}"/> to read and deserialize.
@@ -17,7 +17,7 @@ namespace NamedPipeWrapper.IO
         /// <summary>
         /// Gets the underlying <c>PipeStream</c> object.
         /// </summary>
-        public PipeStream BaseStream { get; private set; }
+        private PipeStream BaseStream { get; set; }
 
         private readonly ICustomSerializer<T> _serializer;
 
@@ -40,15 +40,9 @@ namespace NamedPipeWrapper.IO
             BaseStream.Write(lenbuf, 0, lenbuf.Length);
         }
 
-        private void WriteObject(byte[] data)
-        {
-            BaseStream.Write(data, 0, data.Length);
-        }
+        private void WriteObject(byte[] data) => BaseStream.Write(data, 0, data.Length);
 
-        private void Flush()
-        {
-            BaseStream.Flush();
-        }
+        private void Flush() => BaseStream.Flush();
 
         #endregion
 
@@ -71,9 +65,6 @@ namespace NamedPipeWrapper.IO
         /// <exception cref="ObjectDisposedException">The pipe is closed.</exception>
         /// <exception cref="NotSupportedException">The pipe does not support write operations.</exception>
         /// <exception cref="IOException">The pipe is broken or another I/O error occurred.</exception>
-        public void WaitForPipeDrain()
-        {
-            BaseStream.WaitForPipeDrain();
-        }
+        public void WaitForPipeDrain() => BaseStream.WaitForPipeDrain();
     }
 }
