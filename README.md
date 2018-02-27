@@ -1,4 +1,4 @@
-# Named Pipe Wrapper for .NET 4.7.1
+# Tellurium Library for .NET 4.7.1 version 1.5.4
 
 A simple, easy to use, strongly-typed wrapper around .NET named pipes.
 
@@ -12,6 +12,15 @@ A simple, easy to use, strongly-typed wrapper around .NET named pipes.
 # Requirements
 
 Requires .NET 4.7.1 full.
+
+
+# TODO
+
+* Security managmend + attrubutes strong security
+* Security and Access Rights
+* Rijdael support
+* .NET Core support (Linux NamedPipe and Mac OS)
+* JSON, YAML and custom serializer
 
 # Usage
 
