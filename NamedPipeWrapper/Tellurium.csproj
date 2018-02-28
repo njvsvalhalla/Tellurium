@@ -5,6 +5,7 @@
   </PropertyGroup>
     <PropertyGroup>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AssemblyName>Tellurium</AssemblyName>
   </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
       <LangVersion>latest</LangVersion>
