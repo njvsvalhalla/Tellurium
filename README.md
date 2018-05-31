@@ -1,4 +1,6 @@
 # Tellurium Library for .NET 4.7.1 version 1.5.4
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2F0xF6%2FTellurium.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2F0xF6%2FTellurium?ref=badge_shield)
+
 
 A simple, easy to use, strongly-typed wrapper around .NET named pipes.
 
@@ -67,3 +69,6 @@ client.Start();
 # MIT License
 
 Named Pipe Wrapper for .NET is licensed under the [MIT license](LICENSE.txt).
+
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2F0xF6%2FTellurium.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2F0xF6%2FTellurium?ref=badge_large)
