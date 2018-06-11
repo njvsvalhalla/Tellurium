@@ -8,5 +8,5 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTrademark("NamedPipeWrapper")]
 [assembly: ComVisible(false)]
 [assembly: Guid("73e786a2-83ec-44e0-8c47-2064937d4a2e")]
-[assembly: AssemblyVersion("1.5.5.0")]
-[assembly: AssemblyFileVersion("1.5.5.0")]
+[assembly: AssemblyVersion("2018.6.8.0")]
+[assembly: AssemblyFileVersion("2018.6.8.0")]
