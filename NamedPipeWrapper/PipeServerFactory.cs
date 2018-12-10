@@ -22,7 +22,12 @@
             return pipe;
         }
 
-        public static NamedPipeServerStream CreatePipe(string pipeName, int bufferSize, PipeSecurity security) 
-            => new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.WriteThrough, bufferSize, bufferSize, security);
+        public static NamedPipeServerStream CreatePipe(string pipeName, int bufferSize, PipeSecurity security)
+        {
+            var serverStream = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte,
+                PipeOptions.Asynchronous | PipeOptions.WriteThrough, bufferSize, bufferSize);
+            serverStream.SetAccessControl(security);
+            return serverStream;
+        }
     }
 }
